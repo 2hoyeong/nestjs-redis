@@ -9,7 +9,9 @@ import { delay } from '../app.util';
 export class WithdrawalService {
   constructor(
     @InjectQueue(WITHDRAWAL_QUEUE_NAME) private withdrawalQueue: Queue,
-  ) {}
+  ) {
+    this.test();
+  }
 
   generateRandomAddress() {
     const bytes = randomBytes(20);
@@ -39,20 +41,27 @@ export class WithdrawalService {
     const withdrawals = Array.from(Array(size)).map(() =>
       this.generateRandomWithdrawal(),
     );
-    await delay(100);
+    await delay(150);
     return withdrawals;
   }
 
   async test() {
-    console.time('WITHDRAWAL_QUEUE_WRITE');
+    const COUNT = 100;
     const startDate = Date.now();
-    const withdrawals = await this.getWithdrawals(500);
-    console.timeLog('WITHDRAWAL_QUEUE_WRITE');
-    for await (const withdrawal of withdrawals) {
-      await this.withdrawalQueue.add(withdrawal, { removeOnComplete: true });
-    }
+    const withdrawals = await this.getWithdrawals(COUNT);
+    console.time('WITHDRAWAL_QUEUE_WRITE');
+    // for await (const withdrawal of withdrawals) {
+    //   await this.withdrawalQueue.add(withdrawal);
+    // }
+    await this.withdrawalQueue.addBulk(
+      withdrawals.map((withdrawal) => ({
+        data: withdrawal,
+        opts: { removeOnComplete: true },
+      })),
+    );
     const endDate = Date.now() - startDate;
-    console.log((endDate / 500) * 1000);
+    const tps = 1000 / (endDate / COUNT);
+    console.log(`TPS: ${tps}`);
     console.timeEnd('WITHDRAWAL_QUEUE_WRITE');
   }
 }
